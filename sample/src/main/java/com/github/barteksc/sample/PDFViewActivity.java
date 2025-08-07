@@ -21,13 +21,17 @@ import android.content.pm.PackageManager;
 import android.database.Cursor;
 import android.graphics.Color;
 import android.net.Uri;
+import android.os.Bundle;
 import android.provider.OpenableColumns;
+import android.util.Log;
+import android.view.Menu;
+import android.view.MenuItem;
+import android.widget.Toast;
+
 import androidx.annotation.NonNull;
+import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
-import androidx.appcompat.app.AppCompatActivity;
-import android.util.Log;
-import android.widget.Toast;
 
 import com.github.barteksc.pdfviewer.PDFView;
 import com.github.barteksc.pdfviewer.listener.OnLoadCompleteListener;
@@ -37,18 +41,8 @@ import com.github.barteksc.pdfviewer.scroll.DefaultScrollHandle;
 import com.github.barteksc.pdfviewer.util.FitPolicy;
 import com.shockwave.pdfium.PdfDocument;
 
-import org.androidannotations.annotations.AfterViews;
-import org.androidannotations.annotations.EActivity;
-import org.androidannotations.annotations.NonConfigurationInstance;
-import org.androidannotations.annotations.OnActivityResult;
-import org.androidannotations.annotations.OptionsItem;
-import org.androidannotations.annotations.OptionsMenu;
-import org.androidannotations.annotations.ViewById;
-
 import java.util.List;
 
-@EActivity(R.layout.activity_main)
-@OptionsMenu(R.menu.options)
 public class PDFViewActivity extends AppCompatActivity implements OnPageChangeListener, OnLoadCompleteListener,
         OnPageErrorListener {
 
@@ -60,19 +54,63 @@ public class PDFViewActivity extends AppCompatActivity implements OnPageChangeLi
     public static final String SAMPLE_FILE = "sample.pdf";
     public static final String READ_EXTERNAL_STORAGE = "android.permission.READ_EXTERNAL_STORAGE";
 
-    @ViewById
-    PDFView pdfView;
+    // Replaced @ViewById with findViewById
+    private PDFView pdfView;
 
-    @NonConfigurationInstance
-    Uri uri;
+    // Replaced @NonConfigurationInstance with manual state saving
+    private Uri uri;
+    private Integer pageNumber = 0;
+    private String pdfFileName;
 
-    @NonConfigurationInstance
-    Integer pageNumber = 0;
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        setContentView(R.layout.activity_main);
 
-    String pdfFileName;
+        // Initialize views (replaces @ViewById)
+        pdfView = findViewById(R.id.pdfView);
 
-    @OptionsItem(R.id.pickFile)
-    void pickFile() {
+        // Restore saved instance state
+        if (savedInstanceState != null) {
+            String uriString = savedInstanceState.getString("uri");
+            if (uriString != null) {
+                uri = Uri.parse(uriString);
+            }
+            pageNumber = savedInstanceState.getInt("pageNumber", 0);
+            pdfFileName = savedInstanceState.getString("pdfFileName");
+        }
+
+        // Call what was in @AfterViews
+        afterViews();
+    }
+
+    @Override
+    protected void onSaveInstanceState(@NonNull Bundle outState) {
+        super.onSaveInstanceState(outState);
+        if (uri != null) {
+            outState.putString("uri", uri.toString());
+        }
+        outState.putInt("pageNumber", pageNumber);
+        outState.putString("pdfFileName", pdfFileName);
+    }
+
+    @Override
+    public boolean onCreateOptionsMenu(Menu menu) {
+        getMenuInflater().inflate(R.menu.options, menu);
+        return true;
+    }
+
+    @Override
+    public boolean onOptionsItemSelected(MenuItem item) {
+        if (item.getItemId() == R.id.pickFile) {
+            pickFile();
+            return true;
+        }
+        return super.onOptionsItemSelected(item);
+    }
+
+    // Replaced @OptionsItem
+    private void pickFile() {
         int permissionCheck = ContextCompat.checkSelfPermission(this,
                 READ_EXTERNAL_STORAGE);
 
@@ -89,7 +127,7 @@ public class PDFViewActivity extends AppCompatActivity implements OnPageChangeLi
         launchPicker();
     }
 
-    void launchPicker() {
+    private void launchPicker() {
         Intent intent = new Intent(Intent.ACTION_GET_CONTENT);
         intent.setType("application/pdf");
         try {
@@ -100,15 +138,17 @@ public class PDFViewActivity extends AppCompatActivity implements OnPageChangeLi
         }
     }
 
-    @AfterViews
-    void afterViews() {
+    // Replaced @AfterViews
+    private void afterViews() {
         pdfView.setBackgroundColor(Color.LTGRAY);
         if (uri != null) {
             displayFromUri(uri);
         } else {
             displayFromAsset(SAMPLE_FILE);
         }
-        setTitle(pdfFileName);
+        if (pdfFileName != null) {
+            setTitle(pdfFileName);
+        }
     }
 
     private void displayFromAsset(String assetFileName) {
@@ -140,10 +180,12 @@ public class PDFViewActivity extends AppCompatActivity implements OnPageChangeLi
                 .load();
     }
 
-    @OnActivityResult(REQUEST_CODE)
-    public void onResult(int resultCode, Intent intent) {
-        if (resultCode == RESULT_OK) {
-            uri = intent.getData();
+    // Replaced @OnActivityResult
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode == REQUEST_CODE && resultCode == RESULT_OK && data != null) {
+            uri = data.getData();
             displayFromUri(uri);
         }
     }
@@ -160,7 +202,10 @@ public class PDFViewActivity extends AppCompatActivity implements OnPageChangeLi
             Cursor cursor = getContentResolver().query(uri, null, null, null, null);
             try {
                 if (cursor != null && cursor.moveToFirst()) {
-                    result = cursor.getString(cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME));
+                    int columnIndex = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME);
+                    if (columnIndex != -1) {
+                        result = cursor.getString(columnIndex);
+                    }
                 }
             } finally {
                 if (cursor != null) {
@@ -187,12 +232,10 @@ public class PDFViewActivity extends AppCompatActivity implements OnPageChangeLi
         Log.e(TAG, "modDate = " + meta.getModDate());
 
         printBookmarksTree(pdfView.getTableOfContents(), "-");
-
     }
 
     public void printBookmarksTree(List<PdfDocument.Bookmark> tree, String sep) {
         for (PdfDocument.Bookmark b : tree) {
-
             Log.e(TAG, String.format("%s %s, p %d", sep, b.getTitle(), b.getPageIdx()));
 
             if (b.hasChildren()) {
@@ -211,6 +254,7 @@ public class PDFViewActivity extends AppCompatActivity implements OnPageChangeLi
     @Override
     public void onRequestPermissionsResult(int requestCode, @NonNull String permissions[],
                                            @NonNull int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
         if (requestCode == PERMISSION_CODE) {
             if (grantResults.length > 0
                     && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
