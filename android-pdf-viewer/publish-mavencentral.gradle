@@ -60,12 +60,28 @@ if (secretPropsFile.exists()) {
     ext["sonatypeStagingProfileId"] = System.getenv('SONATYPE_STAGING_PROFILE_ID')
 }
 
+// === BEGIN AGP 8.0+ PUBLISHING CONFIGURATION ===
+// This block is the modern way to handle publishing for Android libraries.
+// It explicitly tells the Android Gradle Plugin which variant to publish.
+if (isAndroid) {
+    android {
+        publishing {
+            // Configure the release variant for publishing.
+            // This is the key change to fix the 'unknown property' error.
+            singleVariant("release")
+        }
+    }
+}
+// === END AGP 8.0+ PUBLISHING CONFIGURATION ===
+
 afterEvaluate {
     publishing {
         publications {
             release(MavenPublication) {
+                // The AGP will now correctly create the 'release' component.
+                // We can use a `findByName` or a safe accessor to get it.
                 if (isAndroid) {
-                    from components.release
+                    from components.findByName('release')
                 } else {
                     from components.java
                 }
