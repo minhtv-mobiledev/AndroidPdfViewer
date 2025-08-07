@@ -634,7 +634,9 @@ public class PDFView extends RelativeLayout {
         // Draws parts
         for (PagePart part : cacheManager.getPageParts()) {
             drawPart(canvas, part);
+            // ✅ THÊM CHECK VISIBLE
             if (callbacks.getOnDrawAll() != null
+                    && isPageVisible(part.getPage())  // ← Thêm dòng này
                     && !onDrawPagesNums.contains(part.getPage())) {
                 onDrawPagesNums.add(part.getPage());
             }
@@ -1056,6 +1058,28 @@ public class PDFView extends RelativeLayout {
         baseX += (pivot.x - pivot.x * dzoom);
         baseY += (pivot.y - pivot.y * dzoom);
         moveTo(baseX, baseY);
+    }
+    /**
+     * Check if a page is currently visible in the viewport
+     */
+    private boolean isPageVisible(int page) {
+        if (pdfFile == null) {
+            return false;
+        }
+
+        float pageStart = pdfFile.getPageOffset(page, zoom);
+        float pageLength = pdfFile.getPageLength(page, zoom);
+        float pageEnd = pageStart + pageLength;
+
+        if (swipeVertical) {
+            float viewportTop = -currentYOffset;
+            float viewportBottom = viewportTop + getHeight();
+            return pageEnd > viewportTop && pageStart < viewportBottom;
+        } else {
+            float viewportLeft = -currentXOffset;
+            float viewportRight = viewportLeft + getWidth();
+            return pageEnd > viewportLeft && pageStart < viewportRight;
+        }
     }
 
     /**
@@ -1525,6 +1549,7 @@ public class PDFView extends RelativeLayout {
             this.nightMode = nightMode;
             return this;
         }
+
 
         public Configurator disableLongpress() {
             PDFView.this.dragPinchManager.disableLongpress();
