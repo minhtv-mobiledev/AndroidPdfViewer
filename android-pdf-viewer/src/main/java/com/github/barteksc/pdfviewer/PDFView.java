@@ -289,7 +289,19 @@ public class PDFView extends RelativeLayout {
         }
 
         page = pdfFile.determineValidPageNumberFrom(page);
-        float offset = page == 0 ? 0 : -pdfFile.getPageOffset(page, zoom);
+        float offset;
+        if (page == 0) {
+            offset = 0;
+        } else {
+            offset = -pdfFile.getPageOffset(page, zoom);
+
+            // Điều chỉnh cho autoSpacing
+            if (isAutoSpacingEnabled()) {
+                // Trừ đi nửa spacing để page nằm sát top
+                float halfSpacing = pdfFile.getPageSpacing(page, zoom) / 2f;
+                offset += halfSpacing;
+            }
+        }
         if (swipeVertical) {
             if (withAnimation) {
                 animationManager.startYAnimation(currentYOffset, offset);
@@ -1251,6 +1263,13 @@ public class PDFView extends RelativeLayout {
 
     public boolean isAutoSpacingEnabled() {
         return autoSpacing;
+    }
+    // Trong PDFView, thêm method:
+    public float getPageSpacing(int pageIndex) {
+        if (pdfFile != null) {
+            return pdfFile.getPageSpacing(pageIndex, 1f);
+        }
+        return spacingPx;
     }
 
     public void setPageFling(boolean pageFling) {
